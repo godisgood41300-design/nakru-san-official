@@ -9,6 +9,7 @@ const socialProviders = [
 ];
 const bootWarnings = [];
 const accountServiceWarning = "Account services are temporarily unavailable. Please refresh in a moment.";
+const supabaseRetryLimit = 20;
 const rooms = [
   { id: "anime", name: "Anime", topic: "Watch parties, openings, episode talk" },
   { id: "gaming", name: "Gaming", topic: "Co-op queues, builds, raids, ranked" },
@@ -93,6 +94,7 @@ const state = {
 state.savedProfile = { ...state.profile };
 
 let supabase = null;
+let supabaseRetryCount = 0;
 
 function validHttpUrl(value) {
   try {
@@ -116,6 +118,10 @@ function hasDashboardSupabaseUrl() {
 function hasProjectSupabaseUrl() {
   const url = String(config.supabaseUrl || "").toLowerCase();
   return /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(url);
+}
+
+function hasUsableSupabaseConfig() {
+  return Boolean(config.supabaseUrl && config.supabaseAnonKey && !hasPlaceholderSupabaseConfig() && !hasDashboardSupabaseUrl() && hasProjectSupabaseUrl());
 }
 
 function setupSupabaseClient() {
@@ -152,6 +158,26 @@ supabase = setupSupabaseClient();
 function ensureSupabaseClient() {
   if (!supabase) supabase = setupSupabaseClient();
   return supabase;
+}
+
+function scheduleSupabaseRetry() {
+  if (supabase || !hasUsableSupabaseConfig()) return;
+
+  window.setTimeout(async () => {
+    if (ensureSupabaseClient()) {
+      await initSupabaseSession();
+      return;
+    }
+
+    supabaseRetryCount += 1;
+    if (supabaseRetryCount < supabaseRetryLimit) {
+      scheduleSupabaseRetry();
+      return;
+    }
+
+    if (!bootWarnings.includes(accountServiceWarning)) bootWarnings.push(accountServiceWarning);
+    render();
+  }, 500);
 }
 
 function redirectUrl() {
@@ -226,14 +252,7 @@ async function init() {
   render();
 
   if (!supabase) {
-    window.setTimeout(async () => {
-      if (ensureSupabaseClient()) {
-        await initSupabaseSession();
-      } else if (config.supabaseUrl && config.supabaseAnonKey && !hasPlaceholderSupabaseConfig()) {
-        if (!bootWarnings.includes(accountServiceWarning)) bootWarnings.push(accountServiceWarning);
-        render();
-      }
-    }, 1200);
+    scheduleSupabaseRetry();
   }
 
   if (!supabase) return;
@@ -719,7 +738,7 @@ function render() {
       <header class="topbar"><button class="brand" onclick="setPage('home')" type="button"><img src="./nakaru-san-logo.png" alt="" /><span>Nakaru-San</span></button><nav>${nav.map(([id, label]) => `<button class="${state.page === id ? "active" : ""}" onclick="setPage('${id}')" type="button">${label}</button>`).join("")}</nav><div class="account-tools">${state.user ? `${avatar(state.profile)}<button class="ghost-action" onclick="signOut()" type="button">Sign out</button>` : `<button class="primary-action" onclick="setPage('edit-profile')" type="button">Sign in</button>`}</div></header>
       <div class="version-badge">${version}</div>
       ${bootWarnings.length ? `<div class="demo-banner">${escapeHtml(bootWarnings[bootWarnings.length - 1])}</div>` : ""}
-      ${!supabase && !bootWarnings.length && !state.user && state.page !== "edit-profile" ? `<div class="demo-banner">Demo mode is active until Supabase config is added. The UI still works locally with saved browser data.</div>` : ""}
+      ${(!config.supabaseUrl || !config.supabaseAnonKey) && !bootWarnings.length && !state.user && state.page !== "edit-profile" ? `<div class="demo-banner">Demo mode is active until Supabase config is added. The UI still works locally with saved browser data.</div>` : ""}
       ${renderPage()}
     </div>
   `;

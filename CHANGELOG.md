@@ -80,3 +80,9 @@
 
 - Added a config guard for accidentally pasted Supabase dashboard URLs.
 - The app now expects `VITE_SUPABASE_URL` to use the real Project URL ending in `.supabase.co`.
+
+## 2026-05-25 - Loading screen fix
+
+- Changed the page so `app.js` no longer waits behind the external Supabase CDN script.
+- The site UI now renders first, then retries Supabase connection in the background.
+- Demo-mode banner now appears only when Supabase config is actually missing.
