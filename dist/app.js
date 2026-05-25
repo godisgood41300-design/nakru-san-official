@@ -8,6 +8,7 @@ const socialProviders = [
   { provider: "instagram", label: "Connect with Instagram", externalUrlKey: "instagramAuthUrl" }
 ];
 const bootWarnings = [];
+const accountServiceWarning = "Account services are temporarily unavailable. Please refresh in a moment.";
 const rooms = [
   { id: "anime", name: "Anime", topic: "Watch parties, openings, episode talk" },
   { id: "gaming", name: "Gaming", topic: "Co-op queues, builds, raids, ranked" },
@@ -102,14 +103,37 @@ function validHttpUrl(value) {
   }
 }
 
+function hasPlaceholderSupabaseConfig() {
+  const url = String(config.supabaseUrl || "").toLowerCase();
+  const key = String(config.supabaseAnonKey || "").toLowerCase();
+  return url.includes("your-project-ref") || key.includes("your-public-anon-key") || key.includes("your-public-publishable-key");
+}
+
+function hasDashboardSupabaseUrl() {
+  return String(config.supabaseUrl || "").toLowerCase().includes("supabase.com/dashboard");
+}
+
+function hasProjectSupabaseUrl() {
+  const url = String(config.supabaseUrl || "").toLowerCase();
+  return /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(url);
+}
+
 function setupSupabaseClient() {
   if (!config.supabaseUrl || !config.supabaseAnonKey) return null;
+  if (hasPlaceholderSupabaseConfig()) {
+    bootWarnings.push("Supabase is not connected yet. Add your real Supabase URL and public key in Render.");
+    return null;
+  }
+  if (hasDashboardSupabaseUrl() || !hasProjectSupabaseUrl()) {
+    bootWarnings.push("Supabase URL is not the Project URL. Use the value ending in .supabase.co from Supabase Project Settings.");
+    return null;
+  }
   if (!validHttpUrl(config.supabaseUrl)) {
     bootWarnings.push("Supabase URL is not valid. The site is running in demo mode.");
     return null;
   }
   if (!window.supabase?.createClient) {
-    bootWarnings.push("Supabase library did not load yet. The site is running in demo mode.");
+    console.warn("Supabase library is not ready yet.");
     return null;
   }
   try {
@@ -203,7 +227,12 @@ async function init() {
 
   if (!supabase) {
     window.setTimeout(async () => {
-      if (ensureSupabaseClient()) await initSupabaseSession();
+      if (ensureSupabaseClient()) {
+        await initSupabaseSession();
+      } else if (config.supabaseUrl && config.supabaseAnonKey && !hasPlaceholderSupabaseConfig()) {
+        if (!bootWarnings.includes(accountServiceWarning)) bootWarnings.push(accountServiceWarning);
+        render();
+      }
     }, 1200);
   }
 
@@ -224,7 +253,7 @@ async function initSupabaseSession() {
     await afterAuthChange();
   } catch (error) {
     console.error("Supabase session load failed", error);
-    bootWarnings.push("Account services are temporarily unavailable. Demo mode is still working.");
+    if (!bootWarnings.includes(accountServiceWarning)) bootWarnings.push(accountServiceWarning);
     render();
   }
 }
@@ -690,7 +719,7 @@ function render() {
       <header class="topbar"><button class="brand" onclick="setPage('home')" type="button"><img src="./nakaru-san-logo.png" alt="" /><span>Nakaru-San</span></button><nav>${nav.map(([id, label]) => `<button class="${state.page === id ? "active" : ""}" onclick="setPage('${id}')" type="button">${label}</button>`).join("")}</nav><div class="account-tools">${state.user ? `${avatar(state.profile)}<button class="ghost-action" onclick="signOut()" type="button">Sign out</button>` : `<button class="primary-action" onclick="setPage('edit-profile')" type="button">Sign in</button>`}</div></header>
       <div class="version-badge">${version}</div>
       ${bootWarnings.length ? `<div class="demo-banner">${escapeHtml(bootWarnings[bootWarnings.length - 1])}</div>` : ""}
-      ${!state.user && state.page !== "edit-profile" ? `<div class="demo-banner">Demo mode is active until Supabase config is added. The UI still works locally with saved browser data.</div>` : ""}
+      ${!supabase && !bootWarnings.length && !state.user && state.page !== "edit-profile" ? `<div class="demo-banner">Demo mode is active until Supabase config is added. The UI still works locally with saved browser data.</div>` : ""}
       ${renderPage()}
     </div>
   `;

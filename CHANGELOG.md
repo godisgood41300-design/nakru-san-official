@@ -63,3 +63,20 @@
 - Build now accepts `VITE_SUPABASE_ANON_KEY`, `SUPABASE_ANON_KEY`, or `SUPABASE_PUBLISHABLE_KEY`.
 - Build logs now print whether Supabase URL/key and app URL were detected.
 - README now explains checking `/config.js` after Render redeploy.
+
+## 2026-05-25 - Live config banner fix
+
+- Fixed the logged-out homepage so it no longer shows the demo-mode banner just because a visitor is not signed in.
+- Added protection against placeholder Supabase values such as `your-project-ref.supabase.co`.
+- Live config checks now show a cleaner message when Render is still using placeholder Supabase environment variables.
+
+## 2026-05-25 - Supabase script load order fix
+
+- Fixed the script order so the Supabase browser library loads before `app.js`.
+- Removed the public technical warning that said `Supabase library did not load yet`.
+- Added a silent retry and a cleaner account-service fallback message.
+
+## 2026-05-25 - Supabase Project URL guard
+
+- Added a config guard for accidentally pasted Supabase dashboard URLs.
+- The app now expects `VITE_SUPABASE_URL` to use the real Project URL ending in `.supabase.co`.

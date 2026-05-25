@@ -67,6 +67,20 @@ INSTAGRAM_AUTH_URL=
 
 After changing Render environment variables, run `Manual Deploy > Clear build cache & deploy`. Then open `/config.js` on your live site. If `supabaseUrl` and `supabaseAnonKey` are still empty there, Render did not rebuild with the variables.
 
+Important: do not leave the example value `https://your-project-ref.supabase.co` in Render. Replace it with the real Supabase Project URL from Supabase Project Settings > API.
+
+The Supabase URL must look like this:
+
+```text
+https://your-project-ref.supabase.co
+```
+
+Do not paste a dashboard page such as:
+
+```text
+https://supabase.com/dashboard/project/your-project-ref/settings/api-keys/legacy
+```
+
 ## Supabase setup
 
 1. Open Supabase.
