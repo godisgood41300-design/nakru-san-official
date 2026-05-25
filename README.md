@@ -55,6 +55,18 @@ VITE_INSTAGRAM_AUTH_URL=
 
 Use the Supabase anon/publishable key only. Never put the service role secret key in frontend env variables.
 
+The build also accepts these alternate names if you already typed them in Render:
+
+```bash
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-public-anon-key
+SUPABASE_PUBLISHABLE_KEY=your-public-publishable-key
+APP_URL=https://your-domain.com
+INSTAGRAM_AUTH_URL=
+```
+
+After changing Render environment variables, run `Manual Deploy > Clear build cache & deploy`. Then open `/config.js` on your live site. If `supabaseUrl` and `supabaseAnonKey` are still empty there, Render did not rebuild with the variables.
+
 ## Supabase setup
 
 1. Open Supabase.

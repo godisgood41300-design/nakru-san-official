@@ -56,3 +56,10 @@
 - Made Supabase client setup defensive so invalid env values cannot crash the whole page.
 - Render now happens immediately before Supabase session loading, so auth/network issues cannot block the UI.
 - Supabase is retried after page load in case the CDN script loads after the main app.
+
+## 2026-05-25 - Supabase config diagnostics
+
+- Build now accepts both `VITE_SUPABASE_URL` and `SUPABASE_URL`.
+- Build now accepts `VITE_SUPABASE_ANON_KEY`, `SUPABASE_ANON_KEY`, or `SUPABASE_PUBLISHABLE_KEY`.
+- Build logs now print whether Supabase URL/key and app URL were detected.
+- README now explains checking `/config.js` after Render redeploy.
