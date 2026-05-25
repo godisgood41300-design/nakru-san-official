@@ -49,3 +49,10 @@
 - Added root-level static files in addition to `dist/` so the package can work if a host serves the upload root.
 - Added `VITE_APP_URL` and `VITE_INSTAGRAM_AUTH_URL` to `render.yaml` env var declarations.
 - Normalized Render static publish path to `dist`.
+
+## 2026-05-25 - Black screen startup guard
+
+- Added visible loading fallback HTML so the app never opens to an empty black page.
+- Made Supabase client setup defensive so invalid env values cannot crash the whole page.
+- Render now happens immediately before Supabase session loading, so auth/network issues cannot block the UI.
+- Supabase is retried after page load in case the CDN script loads after the main app.

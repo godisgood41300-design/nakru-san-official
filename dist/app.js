@@ -7,6 +7,7 @@ const socialProviders = [
   { provider: "twitter", label: "Connect with X" },
   { provider: "instagram", label: "Connect with Instagram", externalUrlKey: "instagramAuthUrl" }
 ];
+const bootWarnings = [];
 const rooms = [
   { id: "anime", name: "Anime", topic: "Watch parties, openings, episode talk" },
   { id: "gaming", name: "Gaming", topic: "Co-op queues, builds, raids, ranked" },
@@ -90,11 +91,44 @@ const state = {
 };
 state.savedProfile = { ...state.profile };
 
-const supabase = config.supabaseUrl && config.supabaseAnonKey && window.supabase
-  ? window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+let supabase = null;
+
+function validHttpUrl(value) {
+  try {
+    const parsed = new URL(String(value || ""));
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function setupSupabaseClient() {
+  if (!config.supabaseUrl || !config.supabaseAnonKey) return null;
+  if (!validHttpUrl(config.supabaseUrl)) {
+    bootWarnings.push("Supabase URL is not valid. The site is running in demo mode.");
+    return null;
+  }
+  if (!window.supabase?.createClient) {
+    bootWarnings.push("Supabase library did not load yet. The site is running in demo mode.");
+    return null;
+  }
+  try {
+    return window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-    })
-  : null;
+    });
+  } catch (error) {
+    console.error("Supabase setup failed", error);
+    bootWarnings.push("Supabase setup failed. The site is running in demo mode.");
+    return null;
+  }
+}
+
+supabase = setupSupabaseClient();
+
+function ensureSupabaseClient() {
+  if (!supabase) supabase = setupSupabaseClient();
+  return supabase;
+}
 
 function redirectUrl() {
   const origin = config.appUrl || window.location.origin;
@@ -164,23 +198,46 @@ async function hashPassword(password) {
 }
 
 async function init() {
-  if (supabase) {
-    const { data } = await supabase.auth.getSession();
-    state.user = data.session?.user || null;
+  state.user = readLocal("nakaru-session", null);
+  render();
+
+  if (!supabase) {
+    window.setTimeout(async () => {
+      if (ensureSupabaseClient()) await initSupabaseSession();
+    }, 1200);
+  }
+
+  if (!supabase) return;
+
+  await initSupabaseSession();
+}
+
+async function initSupabaseSession() {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    state.user = data.session?.user || state.user;
     supabase.auth.onAuthStateChange((_event, session) => {
-      state.user = session?.user || null;
+      state.user = session?.user || readLocal("nakaru-session", null);
       afterAuthChange();
     });
-  } else {
-    state.user = readLocal("nakaru-session", null);
+    await afterAuthChange();
+  } catch (error) {
+    console.error("Supabase session load failed", error);
+    bootWarnings.push("Account services are temporarily unavailable. Demo mode is still working.");
+    render();
   }
-  await afterAuthChange();
 }
 
 async function afterAuthChange() {
   if (state.user) {
-    await loadProfile();
-    await loadPosts();
+    try {
+      await loadProfile();
+      await loadPosts();
+    } catch (error) {
+      console.error("Data load failed", error);
+      bootWarnings.push("Some account data could not load. The public app is still available.");
+    }
   }
   render();
 }
@@ -237,7 +294,7 @@ async function submitAuth(event) {
   state.authStatus = "";
 
   try {
-    if (supabase) {
+    if (ensureSupabaseClient()) {
       if (state.authMode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -297,7 +354,7 @@ async function social(provider) {
     return;
   }
 
-  if (!supabase) {
+  if (!ensureSupabaseClient()) {
     state.authStatus = "Social login needs Supabase provider setup first.";
     render();
     return;
@@ -632,6 +689,7 @@ function render() {
     <div class="app-shell">
       <header class="topbar"><button class="brand" onclick="setPage('home')" type="button"><img src="./nakaru-san-logo.png" alt="" /><span>Nakaru-San</span></button><nav>${nav.map(([id, label]) => `<button class="${state.page === id ? "active" : ""}" onclick="setPage('${id}')" type="button">${label}</button>`).join("")}</nav><div class="account-tools">${state.user ? `${avatar(state.profile)}<button class="ghost-action" onclick="signOut()" type="button">Sign out</button>` : `<button class="primary-action" onclick="setPage('edit-profile')" type="button">Sign in</button>`}</div></header>
       <div class="version-badge">${version}</div>
+      ${bootWarnings.length ? `<div class="demo-banner">${escapeHtml(bootWarnings[bootWarnings.length - 1])}</div>` : ""}
       ${!state.user && state.page !== "edit-profile" ? `<div class="demo-banner">Demo mode is active until Supabase config is added. The UI still works locally with saved browser data.</div>` : ""}
       ${renderPage()}
     </div>
